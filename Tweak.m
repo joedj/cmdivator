@@ -60,24 +60,23 @@
             int ret;
             if (!(ret = posix_spawnattr_init(&cmd_spawnattr))) {
                 if ((ret = posix_spawnattr_setflags(&cmd_spawnattr, POSIX_SPAWN_CLOEXEC_DEFAULT))) {
-                    LOG(@"Unable to set POSIX_SPAWN_CLOEXEC_DEFAULT: [%i] %s", ret, strerror(ret));
+                    LOG(@"posix_spawnattr_setflags: [%i] %s", ret, strerror(ret));
                 }
             } else {
-                LOG(@"Unable to posix_spawnattr_init: [%i] %s", ret, strerror(ret));
+                LOG(@"posix_spawnattr_init: [%i] %s", ret, strerror(ret));
             }
             if (!(ret = posix_spawn_file_actions_init(&cmd_spawn_file_actions))) {
                 if ((ret = posix_spawn_file_actions_addinherit_np(&cmd_spawn_file_actions, STDOUT_FILENO))) {
-                    LOG(@"Unable to posix_spawn_file_actions_addinherit_np(STDOUT): [%i] %s", ret, strerror(ret));
+                    LOG(@"posix_spawn_file_actions_addinherit_np(%i): [%i] %s", STDOUT_FILENO, ret, strerror(ret));
                 }
                 if ((ret = posix_spawn_file_actions_addinherit_np(&cmd_spawn_file_actions, STDERR_FILENO))) {
-                    LOG(@"Unable to posix_spawn_file_actions_addinherit_np(STDERR): [%i] %s", ret, strerror(ret));
+                    LOG(@"posix_spawn_file_actions_addinherit_np(%i): [%i] %s", STDERR_FILENO, ret, strerror(ret));
                 }
             } else {
-                LOG(@"Unable to posix_spawn_file_actions_init: [%i] %s", ret, strerror(ret));
+                LOG(@"posix_spawn_file_actions_init: [%i] %s", ret, strerror(ret));
             }
         });
 
-        LOG(@"Running %@ for event %@", path, event);
         static const char *const cmd_argv[] = { "", NULL };
         static char *cmd_envp[] = { NULL };
         pid_t pid;
@@ -88,7 +87,7 @@
                 ret = waitpid(pid, &status, 0);
             } while (ret == -1 && errno == EINTR);
             if (ret == -1) {
-                LOG(@"Unable to waitpid %i: [%i] %s", pid, errno, strerror(errno));
+                LOG(@"waitpid(%i): [%i] %s", pid, errno, strerror(errno));
             } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
                 LOG(@"%@ exited with status: %i", path, status);
             }
@@ -121,7 +120,6 @@
 
 - (instancetype)init {
     if ((self = [super init])) {
-
         _commandDirectories = @[SYSTEM_COMMANDS_DIRECTORY, USER_COMMANDS_DIRECTORY];
         _commandDirectorySources = [[NSMutableArray alloc] init];
         _eventFds = [[NSMutableArray alloc] init];
@@ -145,16 +143,15 @@
                     });
                     dispatch_resume(commandDirectorySource);
                 } else {
-                    LOG(@"Unable to create commands directory event source: %@", commandDirectory);
+                    LOG(@"dispatch_source_create: %@", commandDirectory);
                     close(eventFd);
                 }
             } else {
-                LOG(@"Unable to watch commands directory: %@: [%i] %s", commandDirectory, errno, strerror(errno));
+                LOG(@"Unable to watch commands directory %@: [%i] %s", commandDirectory, errno, strerror(errno));
             }
         }
 
         [self scanFilesystem];
-
     }
     return self;
 }
