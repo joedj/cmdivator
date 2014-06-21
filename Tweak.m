@@ -1,5 +1,7 @@
 #import <libactivator/libactivator.h>
+#import <spawn.h>
 
+#define LOG(fmt, ...) NSLog(@"Cmdivator: " fmt, ##__VA_ARGS__)
 #define COMMANDS_DIRECTORY (@"~/Library/Cmdivator/Cmds".stringByExpandingTildeInPath)
 
 @interface CmdivatorCmd: NSObject
@@ -31,7 +33,53 @@
 }
 
 - (void)runForEvent:(LAEvent *)event {
-    NSLog(@"Running %@ for event %@", _url, event);
+    NSString *path = _url.path;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+
+        static posix_spawn_file_actions_t cmd_spawn_file_actions;
+        static posix_spawnattr_t cmd_spawnattr;
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{
+            int ret;
+            if (!(ret = posix_spawnattr_init(&cmd_spawnattr))) {
+                if ((ret = posix_spawnattr_setflags(&cmd_spawnattr, POSIX_SPAWN_CLOEXEC_DEFAULT))) {
+                    LOG(@"Unable to set POSIX_SPAWN_CLOEXEC_DEFAULT: [%i] %s", ret, strerror(ret));
+                }
+            } else {
+                LOG(@"Unable to posix_spawnattr_init: [%i] %s", ret, strerror(ret));
+            }
+            if (!(ret = posix_spawn_file_actions_init(&cmd_spawn_file_actions))) {
+                if ((ret = posix_spawn_file_actions_addinherit_np(&cmd_spawn_file_actions, STDOUT_FILENO))) {
+                    LOG(@"Unable to posix_spawn_file_actions_addinherit_np(STDOUT): [%i] %s", ret, strerror(ret));
+                }
+                if ((ret = posix_spawn_file_actions_addinherit_np(&cmd_spawn_file_actions, STDERR_FILENO))) {
+                    LOG(@"Unable to posix_spawn_file_actions_addinherit_np(STDERR): [%i] %s", ret, strerror(ret));
+                }
+            } else {
+                LOG(@"Unable to posix_spawn_file_actions_init: [%i] %s", ret, strerror(ret));
+            }
+        });
+
+        LOG(@"Running %@ for event %@", path, event);
+        static const char *const cmd_argv[] = { "", NULL };
+        static char *cmd_envp[] = { NULL };
+        pid_t pid;
+        int ret;
+        if (!(ret = posix_spawn(&pid, path.fileSystemRepresentation, &cmd_spawn_file_actions, &cmd_spawnattr, (char* const*)cmd_argv, (char* const*)cmd_envp))) {
+            int status;
+            do {
+                ret = waitpid(pid, &status, 0);
+            } while (ret == -1 && errno == EINTR);
+            if (ret == -1) {
+                LOG(@"Unable to waitpid %i: [%i] %s", pid, errno, strerror(errno));
+            } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+                LOG(@"%@ exited with status: %i", path, status);
+            }
+        } else {
+            LOG(@"Unable to spawn %@ for event %@: %i: %s", path, event, ret, strerror(ret));
+        }
+
+    });
 }
 
 @end
