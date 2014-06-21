@@ -139,7 +139,7 @@
                     [_eventFds addObject:@(eventFd)];
                     Cmdivator * __weak w_self = self;
                     dispatch_source_set_event_handler(commandDirectorySource, ^{
-                        [w_self scheduleFilesystemScan:1];
+                        [w_self scheduleFilesystemScan:3];
                     });
                     dispatch_resume(commandDirectorySource);
                 } else {
