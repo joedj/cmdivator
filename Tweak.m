@@ -108,7 +108,7 @@
 
         NSError * __autoreleasing error = nil;
         if (![NSFileManager.defaultManager createDirectoryAtPath:COMMANDS_DIRECTORY withIntermediateDirectories:YES attributes:nil error:&error]) {
-            NSLog(@"Cmdivator: Unable to create user commands directory %@: %@", COMMANDS_DIRECTORY, error);
+            LOG(@"Unable to create user commands directory %@: %@", COMMANDS_DIRECTORY, error);
         }
         _eventFd = open(COMMANDS_DIRECTORY.fileSystemRepresentation, O_EVTONLY);
         if (_eventFd >= 0) {
@@ -120,12 +120,12 @@
                 });
                 dispatch_resume(_commandsDirectorySource);
             } else {
-                NSLog(@"Cmdivator: Unable to create commands directory event source.");
+                LOG(@"Unable to create commands directory event source.");
                 close(_eventFd);
                 _eventFd = -1;
             }
         } else {
-            NSLog(@"Cmdivator: Unable to watch commands directory: [%i] %s", errno, strerror(errno));
+            LOG(@"Unable to watch commands directory: [%i] %s", errno, strerror(errno));
         }
         [self scheduleFilesystemScan:5];
 
@@ -170,7 +170,7 @@
         includingPropertiesForKeys:@[NSURLNameKey, NSURLIsExecutableKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey]
         options:0
         errorHandler:^(NSURL *url, NSError *error) {
-            NSLog(@"Cmdivator: Error while scanning filesystem for new commands: at %@: %@", url, error);
+            LOG(@"Error while scanning filesystem for new commands: at %@: %@", url, error);
             return YES;
         }
     ];
@@ -180,7 +180,7 @@
 
         NSNumber *isSymlink = nil;
         if (![url getResourceValue:&isSymlink forKey:NSURLIsSymbolicLinkKey error:&error]) {
-            NSLog(@"Cmdivator: Error while scanning filesystem for new commands: NSURLIsSymbolicLinkKey: at %@: %@", url, error);
+            LOG(@"Error while scanning filesystem for new commands: NSURLIsSymbolicLinkKey: at %@: %@", url, error);
             continue;
         } else if (isSymlink.boolValue) {
             url = url.URLByResolvingSymlinksInPath;
@@ -191,13 +191,13 @@
 
         NSNumber *isRegularFile = nil;
         if (![url getResourceValue:&isRegularFile forKey:NSURLIsRegularFileKey error:&error]) {
-            NSLog(@"Cmdivator: Error while scanning filesystem for new commands: NSURLIsRegularFileKey: at %@: %@", url, error);
+            LOG(@"Error while scanning filesystem for new commands: NSURLIsRegularFileKey: at %@: %@", url, error);
             continue;
         } else if (isRegularFile.boolValue) {
 
             NSNumber *isExecutable = nil;
             if (![url getResourceValue:&isExecutable forKey:NSURLIsExecutableKey error:&error]) {
-                NSLog(@"Cmdivator: Error while scanning filesystem for new commands: NSURLIsExecutableKey: at %@: %@", url, error);
+                LOG(@"Error while scanning filesystem for new commands: NSURLIsExecutableKey: at %@: %@", url, error);
                 continue;
             } else if (isExecutable.boolValue) {
 
