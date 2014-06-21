@@ -7,7 +7,7 @@ ifdef CCC_ANALYZER_OUTPUT_FORMAT
 endif
 
 ADDITIONAL_CFLAGS += -g -fobjc-arc -fvisibility=hidden
-ADDITIONAL_LDFLAGS += -g -fobjc-arc -x c /dev/null -x none
+ADDITIONAL_LDFLAGS += -g -fobjc-arc -Wl,-map,$@.map -x c /dev/null -x none
 
 TWEAK_NAME = Cmdivator
 
