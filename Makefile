@@ -20,6 +20,7 @@ include $(THEOS_MAKE_PATH)/tweak.mk
 after-stage::
 	$(ECHO_NOTHING)find $(THEOS_STAGING_DIR) \( -iname '*.plist' -or -iname '*.strings' \) -exec plutil -convert binary1 {} \;$(ECHO_END)
 	$(ECHO_NOTHING)find $(THEOS_STAGING_DIR) -d -name '*.dSYM' -execdir rm -rf {} \;$(ECHO_END)
+	$(ECHO_NOTHING)mkdir -p $(THEOS_STAGING_DIR)/Library/Cmdivator/Cmds$(ECHO_END)
 
 after-install::
 	install.exec "(killall backboardd || killall SpringBoard) 2>/dev/null"

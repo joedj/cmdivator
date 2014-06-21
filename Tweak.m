@@ -2,7 +2,10 @@
 #import <spawn.h>
 
 #define LOG(fmt, ...) NSLog(@"Cmdivator: " fmt, ##__VA_ARGS__)
-#define COMMANDS_DIRECTORY (@"~/Library/Cmdivator/Cmds".stringByExpandingTildeInPath)
+
+#define SYSTEM_COMMANDS_DIRECTORY @"/Library/Cmdivator/Cmds"
+#define USER_COMMANDS_DIRECTORY  (@"~/Library/Cmdivator/Cmds".stringByExpandingTildeInPath)
+#define COMMANDS_DIRECTORY_MAXDEPTH 20
 
 @interface CmdivatorCmd: NSObject
 @property (retain, nonatomic) NSURL *url;
@@ -20,6 +23,20 @@
     return self;
 }
 
+- (BOOL)isEqual:(id)other {
+    if (other == self) {
+        return YES;
+    }
+    if (!other || ![other isKindOfClass:[self class]]) {
+        return NO;
+    }
+    return [_url isEqual:((CmdivatorCmd *)other)->_url];
+}
+
+- (NSUInteger)hash {
+    return _url.hash;
+}
+
 - (NSString *)name {
     return _url.lastPathComponent;
 }
@@ -29,7 +46,7 @@
 }
 
 - (NSString *)listenerName {
-    return [@"net.joedj.cmdivator.action.user." stringByAppendingString:_url.path];
+    return [@"net.joedj.cmdivator.listener:" stringByAppendingString:_url.path];
 }
 
 - (void)runForEvent:(LAEvent *)event {
@@ -89,14 +106,15 @@
 
 @implementation Cmdivator {
     NSTimer *_filesystemScanTimer;
-    int _eventFd;
-    dispatch_source_t _commandsDirectorySource;
+    NSArray *_commandDirectories;
+    NSMutableArray *_commandDirectorySources;
+    NSMutableArray *_eventFds;
     NSMutableDictionary *_listeners;
 }
 
 + (void)load {
     @autoreleasepool {
-        static Cmdivator *cmdivator = nil;
+        static Cmdivator *cmdivator;
         cmdivator = [[Cmdivator alloc] init];
     }
 }
@@ -104,55 +122,67 @@
 - (instancetype)init {
     if ((self = [super init])) {
 
+        _commandDirectories = @[SYSTEM_COMMANDS_DIRECTORY, USER_COMMANDS_DIRECTORY];
+        _commandDirectorySources = [[NSMutableArray alloc] init];
+        _eventFds = [[NSMutableArray alloc] init];
         _listeners = [[NSMutableDictionary alloc] init];
 
         NSError * __autoreleasing error = nil;
-        if (![NSFileManager.defaultManager createDirectoryAtPath:COMMANDS_DIRECTORY withIntermediateDirectories:YES attributes:nil error:&error]) {
-            LOG(@"Unable to create user commands directory %@: %@", COMMANDS_DIRECTORY, error);
+        if (![NSFileManager.defaultManager createDirectoryAtPath:USER_COMMANDS_DIRECTORY withIntermediateDirectories:YES attributes:nil error:&error]) {
+            LOG(@"Unable to create user commands directory %@: %@", USER_COMMANDS_DIRECTORY, error);
         }
-        _eventFd = open(COMMANDS_DIRECTORY.fileSystemRepresentation, O_EVTONLY);
-        if (_eventFd >= 0) {
-            _commandsDirectorySource = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, _eventFd, DISPATCH_VNODE_WRITE, dispatch_get_main_queue());
-            if (_commandsDirectorySource) {
-                Cmdivator * __weak w_self = self;
-                dispatch_source_set_event_handler(_commandsDirectorySource, ^{
-                    [w_self scheduleFilesystemScan:5];
-                });
-                dispatch_resume(_commandsDirectorySource);
+
+        for (NSString *commandDirectory in _commandDirectories) {
+            int eventFd = open(commandDirectory.fileSystemRepresentation, O_EVTONLY);
+            if (eventFd >= 0) {
+                dispatch_source_t commandDirectorySource = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, eventFd, DISPATCH_VNODE_WRITE, dispatch_get_main_queue());
+                if (commandDirectorySource) {
+                    [_commandDirectorySources addObject:[NSValue valueWithPointer:commandDirectorySource]];
+                    [_eventFds addObject:@(eventFd)];
+                    Cmdivator * __weak w_self = self;
+                    dispatch_source_set_event_handler(commandDirectorySource, ^{
+                        [w_self scheduleFilesystemScan:1];
+                    });
+                    dispatch_resume(commandDirectorySource);
+                } else {
+                    LOG(@"Unable to create commands directory event source: %@", commandDirectory);
+                    close(eventFd);
+                }
             } else {
-                LOG(@"Unable to create commands directory event source.");
-                close(_eventFd);
-                _eventFd = -1;
+                LOG(@"Unable to watch commands directory: %@: [%i] %s", commandDirectory, errno, strerror(errno));
             }
-        } else {
-            LOG(@"Unable to watch commands directory: [%i] %s", errno, strerror(errno));
         }
-        [self scheduleFilesystemScan:5];
+
+        [self scanFilesystem];
 
     }
     return self;
 }
 
-- (void)registerListeners {
-    for (NSString *listenerName in _listeners) {
-        [LASharedActivator registerListener:self forName:listenerName];
-    }
-}
-
-- (void)unregisterListeners {
+- (void)replaceCommands:(NSSet *)commands {
     for (NSString *listenerName in _listeners) {
         [LASharedActivator unregisterListenerWithName:listenerName];
     }
     _listeners = [[NSMutableDictionary alloc] init];
+    for (CmdivatorCmd *cmd in commands) {
+        NSString *listenerName = cmd.listenerName;
+        _listeners[listenerName] = cmd;
+        [LASharedActivator registerListener:self forName:listenerName];
+    }
 }
 
 - (void)dealloc {
-    if (_commandsDirectorySource) {
-        dispatch_source_cancel(_commandsDirectorySource);
+    for (NSValue *commandDirectorySource in _commandDirectorySources) {
+        dispatch_source_t source = commandDirectorySource.pointerValue;
+        dispatch_source_cancel(source);
+        dispatch_release(source);
     }
-    if (_eventFd >= 0) {
-        close(_eventFd);
+
+    for (NSNumber *eventFd in _eventFds) {
+        close(eventFd.intValue);
     }
+
+    [self replaceCommands:nil];
 }
 
 - (void)scheduleFilesystemScan:(NSUInteger)seconds {
@@ -160,58 +190,71 @@
     _filesystemScanTimer = [NSTimer scheduledTimerWithTimeInterval:seconds target:self selector:@selector(scanFilesystem) userInfo:nil repeats:NO];
 }
 
-- (void)scanFilesystem {
-    [_filesystemScanTimer invalidate];
-    _filesystemScanTimer = nil;
+- (NSArray *)scanForCommandsAtURL:(NSURL *)commandsURL depth:(NSUInteger)depth {
+    if (depth == COMMANDS_DIRECTORY_MAXDEPTH) {
+        LOG(@"Error while scanning filesystem: at %@: Reached max depth: %lu", commandsURL, (unsigned long)depth);
+        return nil;
+    }
 
-    [self unregisterListeners];
-
-    NSDirectoryEnumerator *dirEnumerator = [NSFileManager.defaultManager enumeratorAtURL:[NSURL fileURLWithPath:COMMANDS_DIRECTORY]
+    NSDirectoryEnumerator *dirEnumerator = [NSFileManager.defaultManager enumeratorAtURL:commandsURL
         includingPropertiesForKeys:@[NSURLNameKey, NSURLIsExecutableKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey]
         options:0
         errorHandler:^(NSURL *url, NSError *error) {
-            LOG(@"Error while scanning filesystem for new commands: at %@: %@", url, error);
+            LOG(@"Error while scanning filesystem: at %@: %@", url, error);
             return YES;
         }
     ];
 
+    NSMutableArray *cmds = [[NSMutableArray alloc] init];
     for (NSURL * __strong url in dirEnumerator) {
         NSError * __autoreleasing error = nil;
 
         NSNumber *isSymlink = nil;
         if (![url getResourceValue:&isSymlink forKey:NSURLIsSymbolicLinkKey error:&error]) {
-            LOG(@"Error while scanning filesystem for new commands: NSURLIsSymbolicLinkKey: at %@: %@", url, error);
+            LOG(@"Error while scanning filesystem: NSURLIsSymbolicLinkKey: at %@: %@", url, error);
             continue;
         } else if (isSymlink.boolValue) {
             url = url.URLByResolvingSymlinksInPath;
-            // TODO: could scan recursively here if we found a symlink to a directory, up to some maxdepth
+            NSNumber *isDirectory = nil;
+            if (![url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&error]) {
+                LOG(@"Error while scanning filesystem: NSURLIsDirectoryKey: at %@: %@", url, error);
+            } else if (isDirectory.boolValue) {
+                [cmds addObjectsFromArray:[self scanForCommandsAtURL:url depth:depth + 1]];
+            }
         }
 
         url = url.URLByStandardizingPath;
-
         NSNumber *isRegularFile = nil;
         if (![url getResourceValue:&isRegularFile forKey:NSURLIsRegularFileKey error:&error]) {
-            LOG(@"Error while scanning filesystem for new commands: NSURLIsRegularFileKey: at %@: %@", url, error);
-            continue;
+            LOG(@"Error while scanning filesystem: NSURLIsRegularFileKey: at %@: %@", url, error);
         } else if (isRegularFile.boolValue) {
-
             NSNumber *isExecutable = nil;
             if (![url getResourceValue:&isExecutable forKey:NSURLIsExecutableKey error:&error]) {
-                LOG(@"Error while scanning filesystem for new commands: NSURLIsExecutableKey: at %@: %@", url, error);
-                continue;
+                LOG(@"Error while scanning filesystem: NSURLIsExecutableKey: at %@: %@", url, error);
             } else if (isExecutable.boolValue) {
-
                 CmdivatorCmd *cmd = [[CmdivatorCmd alloc] initWithURL:url];
-                _listeners[cmd.listenerName] = cmd;
-
+                [cmds addObject:cmd];
             }
-
         }
-
     }
+    return cmds;
+}
 
-    [self registerListeners];
-    [self scheduleFilesystemScan:43200];
+- (void)scanFilesystem {
+    [_filesystemScanTimer invalidate];
+    _filesystemScanTimer = nil;
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSMutableSet *cmds = [[NSMutableSet alloc] init];
+        for (NSString *commandDirectory in _commandDirectories) {
+            NSURL *commandDirectoryURL = [[NSURL fileURLWithPath:commandDirectory] URLByResolvingSymlinksInPath];
+            [cmds addObjectsFromArray:[self scanForCommandsAtURL:commandDirectoryURL depth:0]];
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self replaceCommands:cmds];
+            [self scheduleFilesystemScan:43200];
+        });
+    });
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event forListenerName:(NSString *)listenerName {
