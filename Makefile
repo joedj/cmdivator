@@ -11,7 +11,7 @@ ADDITIONAL_LDFLAGS += -g -fobjc-arc -Wl,-map,$@.map -x c /dev/null -x none
 
 TWEAK_NAME = Cmdivator
 
-Cmdivator_FILES = Cmdivator.m CmdivatorCmd.m CmdivatorScanner.m
+Cmdivator_FILES = Cmdivator.m CmdivatorCmd.m CmdivatorScanner.m CmdivatorDirectoryEnumerator.m
 Cmdivator_LIBRARIES = activator
 
 include theos/makefiles/common.mk

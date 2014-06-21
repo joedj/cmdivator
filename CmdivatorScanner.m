@@ -1,3 +1,4 @@
+#import "CmdivatorDirectoryEnumerator.h"
 #import "CmdivatorScanner.h"
 #import "Common.h"
 
@@ -9,10 +10,22 @@
 
 @implementation CmdivatorScanner {
     CmdivatorScannerCallback _callback;
+    CmdivatorDirectoryEnumerator *_enumerator;
     NSTimer *_timer;
     NSArray *_dirs;
     NSMutableArray *_sources;
     NSMutableArray *_eventFds;
+}
+
+- (instancetype)init {
+    if ((self = [super init])) {
+        _enumerator = [[CmdivatorDirectoryEnumerator alloc] initWithMaxDepth:COMMANDS_DIRECTORY_MAXDEPTH includePropertiesForKeys:@[NSURLIsExecutableKey]];
+    }
+    return self;
+}
+
+- (void)dealloc {
+    [self stop];
 }
 
 - (void)startWithCallback:(CmdivatorScannerCallback)callback {
@@ -70,19 +83,24 @@
     _eventFds = nil;
 }
 
-- (void)dealloc {
-    [self stop];
-}
-
 - (void)scan {
     [_timer invalidate];
     _timer = nil;
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSMutableSet *urls = [[NSMutableSet alloc] init];
+        CmdivatorDirectoryEnumeratorCallback callback = ^(NSURL *url) {
+            NSError * __autoreleasing error = nil;
+            NSNumber *isExecutable = nil;
+            if (![url getResourceValue:&isExecutable forKey:NSURLIsExecutableKey error:&error]) {
+                LOG(@"Error while scanning filesystem: NSURLIsExecutableKey: at %@: %@", url, error);
+            } else if (isExecutable.boolValue) {
+                [urls addObject:url];
+            }
+        };
         for (NSString *dir in _dirs) {
             NSURL *dirURL = [[NSURL fileURLWithPath:dir] URLByResolvingSymlinksInPath];
-            [urls addObjectsFromArray:[self scanForCommandsAtURL:dirURL depth:0]];
+            [_enumerator enumerateFilesAtURL:dirURL callback:callback];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
             if (_callback) {
@@ -99,55 +117,6 @@
     if (_callback) {
         _timer = [NSTimer scheduledTimerWithTimeInterval:seconds target:self selector:@selector(scan) userInfo:nil repeats:NO];
     }
-}
-
-- (NSArray *)scanForCommandsAtURL:(NSURL *)commandsURL depth:(unsigned int)depth {
-    if (depth == COMMANDS_DIRECTORY_MAXDEPTH) {
-        LOG(@"Error while scanning filesystem: at %@: Reached max depth: %u", commandsURL, depth);
-        return nil;
-    }
-
-    NSDirectoryEnumerator *dirEnumerator = [NSFileManager.defaultManager enumeratorAtURL:commandsURL
-        includingPropertiesForKeys:@[NSURLNameKey, NSURLIsExecutableKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey]
-        options:0
-        errorHandler:^(NSURL *url, NSError *error) {
-            LOG(@"Error while scanning filesystem: at %@: %@", url, error);
-            return YES;
-        }
-    ];
-
-    NSMutableArray *urls = [[NSMutableArray alloc] init];
-    for (NSURL * __strong url in dirEnumerator) {
-        NSError * __autoreleasing error = nil;
-
-        NSNumber *isSymlink = nil;
-        if (![url getResourceValue:&isSymlink forKey:NSURLIsSymbolicLinkKey error:&error]) {
-            LOG(@"Error while scanning filesystem: NSURLIsSymbolicLinkKey: at %@: %@", url, error);
-            continue;
-        } else if (isSymlink.boolValue) {
-            url = url.URLByResolvingSymlinksInPath;
-            NSNumber *isDirectory = nil;
-            if (![url getResourceValue:&isDirectory forKey:NSURLIsDirectoryKey error:&error]) {
-                LOG(@"Error while scanning filesystem: NSURLIsDirectoryKey: at %@: %@", url, error);
-            } else if (isDirectory.boolValue) {
-                [urls addObjectsFromArray:[self scanForCommandsAtURL:url depth:depth + 1]];
-            }
-        }
-
-        url = url.URLByStandardizingPath;
-        NSNumber *isRegularFile = nil;
-        if (![url getResourceValue:&isRegularFile forKey:NSURLIsRegularFileKey error:&error]) {
-            LOG(@"Error while scanning filesystem: NSURLIsRegularFileKey: at %@: %@", url, error);
-        } else if (isRegularFile.boolValue) {
-            NSNumber *isExecutable = nil;
-            if (![url getResourceValue:&isExecutable forKey:NSURLIsExecutableKey error:&error]) {
-                LOG(@"Error while scanning filesystem: NSURLIsExecutableKey: at %@: %@", url, error);
-            } else if (isExecutable.boolValue) {
-                [urls addObject:url];
-            }
-        }
-    }
-    return urls;
 }
 
 @end
