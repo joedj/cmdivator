@@ -1,15 +1,15 @@
 Package: net.joedj.cmdivator
 Name: Cmdivator
-Depends: firmware (>= 5.0), mobilesubstrate, libactivator
 Version: 0.1
-Architecture: iphoneos-arm
-Description: Invoke custom commands via Activator
-Maintainer: BigBoss <bigboss@thebigboss.org>
 Author: joedj <cmdivator@joedj.net>
+Maintainer: BigBoss <bigboss@thebigboss.org>
+Depends: firmware (>= 5.0), mobilesubstrate, libactivator
+Architecture: iphoneos-arm
+Description: Run custom commands via Activator
 Section: Tweaks
 Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=cmdivatorDp
 Homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=cmdivatorDp
-Icon: file:///Library/PreferenceBundles/Cmdivator.bundle/Cmdivator@2x.png
+Icon: file:///Library/Cmdivator/Cmdivator.png
 Sponsor: thebigboss.org <http://thebigboss.org>
 Tag: purpose::extension, role::enduser
 dev: joejordan
