@@ -6,6 +6,11 @@
 #define SYSTEM_COMMANDS_DIRECTORY @"/Library/Cmdivator/Cmds"
 #define USER_COMMANDS_DIRECTORY  (@"~/Library/Cmdivator/Cmds".stringByExpandingTildeInPath)
 #define COMMANDS_DIRECTORY_MAXDEPTH 20
+#define FS_EVENT_SCAN_DELAY_SECONDS 3
+#define FALLBACK_SCAN_INTERVAL_SECONDS 43200
+
+#define ACTIVATOR_GROUP @"Cmdivator"
+#define LISTENER_NAME_PREFIX @"net.joedj.cmdivator.listener:"
 
 @interface CmdivatorCmd: NSObject
 @property (retain, nonatomic) NSURL *url;
@@ -46,7 +51,7 @@
 }
 
 - (NSString *)listenerName {
-    return [@"net.joedj.cmdivator.listener:" stringByAppendingString:_url.path];
+    return [LISTENER_NAME_PREFIX stringByAppendingString:_url.path];
 }
 
 - (void)runForEvent:(LAEvent *)event {
@@ -139,7 +144,7 @@
                     [_eventFds addObject:@(eventFd)];
                     Cmdivator * __weak w_self = self;
                     dispatch_source_set_event_handler(commandDirectorySource, ^{
-                        [w_self scheduleFilesystemScan:3];
+                        [w_self scheduleFilesystemScan:FS_EVENT_SCAN_DELAY_SECONDS];
                     });
                     dispatch_resume(commandDirectorySource);
                 } else {
@@ -187,9 +192,9 @@
     _filesystemScanTimer = [NSTimer scheduledTimerWithTimeInterval:seconds target:self selector:@selector(scanFilesystem) userInfo:nil repeats:NO];
 }
 
-- (NSArray *)scanForCommandsAtURL:(NSURL *)commandsURL depth:(NSUInteger)depth {
+- (NSArray *)scanForCommandsAtURL:(NSURL *)commandsURL depth:(unsigned int)depth {
     if (depth == COMMANDS_DIRECTORY_MAXDEPTH) {
-        LOG(@"Error while scanning filesystem: at %@: Reached max depth: %lu", commandsURL, (unsigned long)depth);
+        LOG(@"Error while scanning filesystem: at %@: Reached max depth: %u", commandsURL, depth);
         return nil;
     }
 
@@ -249,7 +254,7 @@
         }
         dispatch_async(dispatch_get_main_queue(), ^{
             [self replaceCommands:cmds];
-            [self scheduleFilesystemScan:43200];
+            [self scheduleFilesystemScan:FALLBACK_SCAN_INTERVAL_SECONDS];
         });
     });
 }
@@ -261,7 +266,7 @@
 }
 
 - (NSString *)activator:(LAActivator *)activator requiresLocalizedGroupForListenerName:(NSString *)listenerName {
-    return @"Cmdivator";
+    return ACTIVATOR_GROUP;
 }
 
 - (NSString *)activator:(LAActivator *)activator requiresLocalizedTitleForListenerName:(NSString *)listenerName {
