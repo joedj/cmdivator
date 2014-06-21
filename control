@@ -1,6 +1,6 @@
 Package: net.joedj.cmdivator
 Name: Cmdivator
-Depends: firmware (>= 4.3), mobilesubstrate, libactivator
+Depends: firmware (>= 5.0), mobilesubstrate, libactivator
 Version: 0.1
 Architecture: iphoneos-arm
 Description: Invoke custom commands via Activator
