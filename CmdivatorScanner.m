@@ -14,7 +14,6 @@
     NSTimer *_timer;
     NSArray *_dirs;
     NSMutableArray *_sources;
-    NSMutableArray *_eventFds;
 }
 
 - (instancetype)init {
@@ -33,7 +32,6 @@
     _callback = callback;
     _dirs = @[SYSTEM_COMMANDS_DIRECTORY, USER_COMMANDS_DIRECTORY];
     _sources = [[NSMutableArray alloc] init];
-    _eventFds = [[NSMutableArray alloc] init];
 
     NSError * __autoreleasing error = nil;
     if (![NSFileManager.defaultManager createDirectoryAtPath:USER_COMMANDS_DIRECTORY withIntermediateDirectories:YES attributes:nil error:&error]) {
@@ -46,10 +44,12 @@
             dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_VNODE, eventFd, DISPATCH_VNODE_WRITE, dispatch_get_main_queue());
             if (source) {
                 [_sources addObject:[NSValue valueWithPointer:source]];
-                [_eventFds addObject:@(eventFd)];
                 CmdivatorScanner * __weak w_self = self;
                 dispatch_source_set_event_handler(source, ^{
                     [w_self scheduleScan:FS_EVENT_SCAN_DELAY_SECONDS];
+                });
+                dispatch_source_set_cancel_handler(source, ^{
+                    close(eventFd);
                 });
                 dispatch_resume(source);
             } else {
@@ -76,11 +76,6 @@
         dispatch_release(source);
     }
     _sources = nil;
-
-    for (NSNumber *eventFd in _eventFds) {
-        close(eventFd.intValue);
-    }
-    _eventFds = nil;
 }
 
 - (void)scan {
