@@ -13,6 +13,7 @@ TWEAK_NAME = Cmdivator
 
 Cmdivator_FILES = Cmdivator.m CmdivatorCmd.m CmdivatorScanner.m CmdivatorDirectoryEnumerator.m
 Cmdivator_LIBRARIES = activator
+Cmdivator_FRAMEWORKS = UIKit
 
 include theos/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/tweak.mk

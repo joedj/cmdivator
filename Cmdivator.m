@@ -11,6 +11,7 @@
 
 @implementation Cmdivator {
     NSMutableDictionary *_listeners;
+    NSMutableDictionary *_icons;
     CmdivatorScanner *_scanner;
 }
 
@@ -24,18 +25,28 @@
 - (instancetype)init {
     if ((self = [super init])) {
         _listeners = [[NSMutableDictionary alloc] init];
+        _icons = [[NSMutableDictionary alloc] init];
         _scanner = [[CmdivatorScanner alloc] init];
         Cmdivator * __weak w_self = self;
         [_scanner startWithCallback:^(NSSet *urls) {
             [w_self replaceCommandsWithURLs:urls];
         }];
+        [NSNotificationCenter.defaultCenter addObserver:self
+            selector:@selector(didReceiveMemoryWarning:)
+            name:UIApplicationDidReceiveMemoryWarningNotification
+            object:nil];
     }
     return self;
 }
 
 - (void)dealloc {
+    [NSNotificationCenter.defaultCenter removeObserver:self];
     [_scanner stop];
     [self replaceCommandsWithURLs:nil];
+}
+
+- (void)didReceiveMemoryWarning:(NSNotification *)notification {
+    [_icons removeAllObjects];
 }
 
 - (void)replaceCommandsWithURLs:(NSSet *)urls {
@@ -71,7 +82,18 @@
     return cmd.displayPath;
 }
 
-// - (NSData *)activator:(LAActivator *)activator requiresIconDataForListenerName:(NSString *)listenerName scale:(CGFloat *)scale;
-// - (NSData *)activator:(LAActivator *)activator requiresSmallIconDataForListenerName:(NSString *)listenerName scale:(CGFloat *)scale;
+- (NSData *)activator:(LAActivator *)activator requiresSmallIconDataForListenerName:(NSString *)listenerName scale:(CGFloat *)scale {
+    NSData *icon = _icons[@(*scale)];
+    if (!icon) {
+        if (*scale == 1.0) {
+            icon = [NSData dataWithContentsOfFile:@"/Library/Cmdivator/Icon.png"];
+        } else {
+            *scale = 2.0;
+            icon = [NSData dataWithContentsOfFile:@"/Library/Cmdivator/Icon@2x.png"];
+        }
+        _icons[@(*scale)] = icon;
+    }
+    return icon;
+}
 
 @end
