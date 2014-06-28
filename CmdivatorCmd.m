@@ -55,7 +55,8 @@
             }
         });
 
-        const char *const cmd = _url.path.fileSystemRepresentation;
+        NSString *path = _url.path;
+        const char *const cmd = path.fileSystemRepresentation;
         const char *const cmd_argv[] = { cmd, NULL };
         const char *const cmd_envp[] = {
             [@"ACTIVATOR_LISTENER_NAME=" stringByAppendingString:self.listenerName].UTF8String,
@@ -66,17 +67,20 @@
         pid_t pid;
         int ret;
         if (!(ret = posix_spawn(&pid, cmd, &cmd_spawn_file_actions, &cmd_spawnattr, (char* const*)cmd_argv, (char* const*)cmd_envp))) {
-            int status;
-            do {
-                ret = waitpid(pid, &status, 0);
-            } while (ret == -1 && errno == EINTR);
-            if (ret == -1) {
-                LOG(@"waitpid(%i): [%i] %s", pid, errno, strerror(errno));
-            } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
-                LOG(@"%s exited with status: %i", cmd, status);
-            }
+            dispatch_source_t exit_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, pid, DISPATCH_PROC_EXIT, dispatch_get_main_queue());
+            dispatch_source_set_event_handler(exit_source, ^{
+                int status;
+                if (waitpid(pid, &status, WNOHANG) == -1) {
+                    LOG(@"waitpid(%i): [%i] %s", pid, errno, strerror(errno));
+                } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+                    LOG(@"%@ exited with status: %i", path, status);
+                }
+                dispatch_source_cancel(exit_source);
+                dispatch_release(exit_source);
+            });
+            dispatch_resume(exit_source);
         } else {
-            LOG(@"Unable to spawn %s for event %@: %i: %s", cmd, event, ret, strerror(ret));
+            LOG(@"Unable to spawn %@ for event %@: %i: %s", path, event, ret, strerror(ret));
         }
 
     });
