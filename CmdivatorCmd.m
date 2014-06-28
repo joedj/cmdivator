@@ -72,15 +72,20 @@
                 int status;
                 if (waitpid(pid, &status, WNOHANG) == -1) {
                     LOG(@"waitpid(%i): [%i] %s", pid, errno, strerror(errno));
-                } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
-                    LOG(@"%@ exited with status: %i", path, status);
+                } else if (WIFEXITED(status)) {
+                    int exitStatus = WEXITSTATUS(status);
+                    if (exitStatus != 0) {
+                        LOG(@"%@ terminated with status: %i", path, exitStatus);
+                    }
+                } else if (WIFSIGNALED(status)) {
+                    LOG(@"%@ terminated by signal: %i", path, WTERMSIG(status));
                 }
                 dispatch_source_cancel(exit_source);
                 dispatch_release(exit_source);
             });
             dispatch_resume(exit_source);
         } else {
-            LOG(@"Unable to spawn %@ for event %@: %i: %s", path, event, ret, strerror(ret));
+            LOG(@"Unable to spawn %@ for event %@: [%i] %s", path, event, ret, strerror(ret));
         }
 
     });
