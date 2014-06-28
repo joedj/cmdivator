@@ -29,7 +29,6 @@
 }
 
 - (void)runForEvent:(LAEvent *)event {
-    NSString *path = _url.path;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 
         static posix_spawn_file_actions_t cmd_spawn_file_actions;
@@ -56,11 +55,17 @@
             }
         });
 
-        static const char *const cmd_argv[] = { "", NULL };
-        static char *cmd_envp[] = { NULL };
+        const char *const cmd = _url.path.fileSystemRepresentation;
+        const char *const cmd_argv[] = { cmd, NULL };
+        const char *const cmd_envp[] = {
+            [@"ACTIVATOR_LISTENER_NAME=" stringByAppendingString:self.listenerName].UTF8String,
+            [@"ACTIVATOR_EVENT_NAME=" stringByAppendingString:event.name].UTF8String,
+            [@"ACTIVATOR_EVENT_MODE=" stringByAppendingString:event.mode].UTF8String,
+            NULL
+        };
         pid_t pid;
         int ret;
-        if (!(ret = posix_spawn(&pid, path.fileSystemRepresentation, &cmd_spawn_file_actions, &cmd_spawnattr, (char* const*)cmd_argv, (char* const*)cmd_envp))) {
+        if (!(ret = posix_spawn(&pid, cmd, &cmd_spawn_file_actions, &cmd_spawnattr, (char* const*)cmd_argv, (char* const*)cmd_envp))) {
             int status;
             do {
                 ret = waitpid(pid, &status, 0);
@@ -68,10 +73,10 @@
             if (ret == -1) {
                 LOG(@"waitpid(%i): [%i] %s", pid, errno, strerror(errno));
             } else if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
-                LOG(@"%@ exited with status: %i", path, status);
+                LOG(@"%s exited with status: %i", cmd, status);
             }
         } else {
-            LOG(@"Unable to spawn %@ for event %@: %i: %s", path, event, ret, strerror(ret));
+            LOG(@"Unable to spawn %s for event %@: %i: %s", cmd, event, ret, strerror(ret));
         }
 
     });
