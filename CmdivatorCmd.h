@@ -7,4 +7,5 @@
 @property (readonly, nonatomic) NSString *listenerName;
 @property (readonly, nonatomic) NSDictionary *dictionary;
 - (void)runForEvent:(LAEvent *)event;
+- (BOOL)delete;
 @end

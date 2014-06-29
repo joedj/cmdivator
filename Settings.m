@@ -74,6 +74,7 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
             PSSpecifier *cmdSpecifier = [PSSpecifier preferenceSpecifierNamed:cmd[@"displayName"] target:self set:nil get:nil detail:nil cell:PSLinkCell edit:nil];
             [cmdSpecifier setProperty:cmd[@"listenerName"] forKey:@"activatorListener"];
             [cmdSpecifier setProperty:cmd[@"displayName"] forKey:@"activatorTitle"];
+            [cmdSpecifier setProperty:cmd[@"path"] forKey:@"cmdivatorPath"];
             [cmdSpecifier setProperty:[NSBundle bundleWithIdentifier:@"com.libactivator.preferencebundle"].bundlePath forKey:@"lazy-bundle"];
             cmdSpecifier->action = @selector(lazyLoadBundle:);
             [specifiers addObject:cmdSpecifier];
@@ -84,6 +85,25 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 
 - (void)refreshCommands {
     [_messagingCenter sendMessageName:@"refreshCommands" userInfo:nil];
+}
+
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+    int specifierIndex = [self indexOfGroup:indexPath.section] + indexPath.row + 1;
+    PSSpecifier *specifier = [_specifiers objectAtIndex:specifierIndex];
+    NSString *path = [specifier propertyForKey:@"cmdivatorPath"];
+    if (path && [NSFileManager.defaultManager isDeletableFileAtPath:path]) {
+        return UITableViewCellEditingStyleDelete;
+    }
+    return UITableViewCellEditingStyleNone;
+}
+
+- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
+    if (editingStyle == UITableViewCellEditingStyleDelete) {
+        int specifierIndex = [self indexOfGroup:indexPath.section] + indexPath.row + 1;
+        PSSpecifier *specifier = [self specifierAtIndex:specifierIndex];
+        NSString *listenerName = [specifier propertyForKey:@"activatorListener"];
+        [_messagingCenter sendMessageName:@"deleteCommand" userInfo:@{ @"listenerName" : listenerName }];
+    }
 }
 
 @end

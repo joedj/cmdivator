@@ -38,6 +38,7 @@
         _messagingCenter = [CPDistributedMessagingCenter centerNamed:MESSAGE_CENTER_NAME];
         [_messagingCenter registerForMessageName:@"listCommands" target:self selector:@selector(listCommands)];
         [_messagingCenter registerForMessageName:@"refreshCommands" target:self selector:@selector(refreshCommands)];
+        [_messagingCenter registerForMessageName:@"deleteCommand" target:self selector:@selector(deleteCommandForMessageName:userInfo:)];
         [_messagingCenter runServerOnCurrentThread];
 
         [NSNotificationCenter.defaultCenter addObserver:self
@@ -111,6 +112,13 @@
 
 - (void)refreshCommands {
     [_scanner scan];
+}
+
+- (void)deleteCommandForMessageName:(NSString *)messageName userInfo:(NSDictionary *)userInfo {
+    CmdivatorCmd *cmd = _listeners[userInfo[@"listenerName"]];
+    if ([cmd delete]) {
+        [self refreshCommands];
+    }
 }
 
 - (void)didReceiveMemoryWarning:(NSNotification *)notification {

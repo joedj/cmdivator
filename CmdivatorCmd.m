@@ -31,7 +31,8 @@
 - (NSDictionary *)dictionary {
     return @{
         @"displayName" : self.displayName,
-        @"listenerName" : self.listenerName
+        @"listenerName" : self.listenerName,
+        @"path" : _url.path
     };
 }
 
@@ -96,6 +97,15 @@
         }
 
     });
+}
+
+- (BOOL)delete {
+    NSError * __autoreleasing error = nil;
+    if (![NSFileManager.defaultManager removeItemAtURL:_url error:&error]) {
+        LOG(@"Unable to delete command %@: %@", _url, error);
+        return NO;
+    }
+    return YES;
 }
 
 @end
