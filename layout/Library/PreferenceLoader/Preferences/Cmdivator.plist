@@ -1,0 +1,10 @@
+{
+    entry = {
+        bundle = Cmdivator;
+        cell = PSLinkCell;
+        detail = CmdivatorSettingsController;
+        icon = Icon.png;
+        isController = 1;
+        label = Cmdivator;
+    };
+}

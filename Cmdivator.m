@@ -1,4 +1,6 @@
+#import <AppSupport/CPDistributedMessagingCenter.h>
 #import <libactivator/libactivator.h>
+#import <notify.h>
 
 #import "CmdivatorCmd.h"
 #import "CmdivatorScanner.h"
@@ -13,6 +15,7 @@
     NSMutableDictionary *_listeners;
     NSMutableDictionary *_icons;
     CmdivatorScanner *_scanner;
+    CPDistributedMessagingCenter *_messagingCenter;
 }
 
 + (void)load {
@@ -26,11 +29,18 @@
     if ((self = [super init])) {
         _listeners = [[NSMutableDictionary alloc] init];
         _icons = [[NSMutableDictionary alloc] init];
+
         _scanner = [[CmdivatorScanner alloc] init];
         Cmdivator * __weak w_self = self;
         [_scanner startWithCallback:^(NSSet *urls) {
             [w_self replaceCommandsWithURLs:urls];
         }];
+
+        _messagingCenter = [CPDistributedMessagingCenter centerNamed:MESSAGE_CENTER_NAME];
+        [_messagingCenter registerForMessageName:@"listCommands" target:self selector:@selector(listCommands)];
+        [_messagingCenter registerForMessageName:@"refreshCommands" target:self selector:@selector(refreshCommands)];
+        [_messagingCenter runServerOnCurrentThread];
+
         [NSNotificationCenter.defaultCenter addObserver:self
             selector:@selector(didReceiveMemoryWarning:)
             name:UIApplicationDidReceiveMemoryWarningNotification
@@ -45,10 +55,6 @@
     [self replaceCommandsWithURLs:nil];
 }
 
-- (void)didReceiveMemoryWarning:(NSNotification *)notification {
-    [_icons removeAllObjects];
-}
-
 - (void)replaceCommandsWithURLs:(NSSet *)urls {
     for (NSString *listenerName in _listeners) {
         [LASharedActivator unregisterListenerWithName:listenerName];
@@ -60,6 +66,7 @@
         _listeners[listenerName] = cmd;
         [LASharedActivator registerListener:self forName:listenerName];
     }
+    notify_post(COMMANDS_CHANGED_NOTIFICATION);
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event forListenerName:(NSString *)listenerName {
@@ -86,14 +93,29 @@
     NSData *icon = _icons[@(*scale)];
     if (!icon) {
         if (*scale == 1.0) {
-            icon = [NSData dataWithContentsOfFile:@"/Library/Cmdivator/Icon.png"];
+            icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon.png"];
         } else {
             *scale = 2.0;
-            icon = [NSData dataWithContentsOfFile:@"/Library/Cmdivator/Icon@2x.png"];
+            icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon@2x.png"];
         }
         _icons[@(*scale)] = icon;
     }
     return icon;
+}
+
+- (NSDictionary *)listCommands {
+    NSArray *sortedCommands = [_listeners.allValues sortedArrayUsingComparator:^NSComparisonResult(CmdivatorCmd *cmd1, CmdivatorCmd *cmd2) {
+        return [cmd1.displayName caseInsensitiveCompare:cmd2.displayName];
+    }];
+    return @{ @"commands" : [sortedCommands valueForKey:@"dictionary"] };
+}
+
+- (void)refreshCommands {
+    [_scanner scan];
+}
+
+- (void)didReceiveMemoryWarning:(NSNotification *)notification {
+    [_icons removeAllObjects];
 }
 
 @end

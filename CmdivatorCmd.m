@@ -28,6 +28,13 @@
     return [LISTENER_NAME_PREFIX stringByAppendingString:_url.path];
 }
 
+- (NSDictionary *)dictionary {
+    return @{
+        @"displayName" : self.displayName,
+        @"listenerName" : self.listenerName
+    };
+}
+
 - (void)runForEvent:(LAEvent *)event {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 

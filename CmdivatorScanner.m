@@ -2,8 +2,6 @@
 #import "CmdivatorScanner.h"
 #import "Common.h"
 
-#define SYSTEM_COMMANDS_DIRECTORY @"/Library/Cmdivator/Cmds"
-#define USER_COMMANDS_DIRECTORY  (@"~/Library/Cmdivator/Cmds".stringByExpandingTildeInPath)
 #define COMMANDS_DIRECTORY_MAXDEPTH 20
 #define FS_EVENT_SCAN_DELAY_SECONDS 3
 #define FALLBACK_SCAN_INTERVAL_SECONDS 43200

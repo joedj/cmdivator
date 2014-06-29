@@ -3,13 +3,13 @@ Name: Cmdivator
 Version: 0.1
 Author: joedj <cmdivator@joedj.net>
 Maintainer: BigBoss <bigboss@thebigboss.org>
-Depends: firmware (>= 5.0), mobilesubstrate, libactivator
+Depends: firmware (>= 5.0), mobilesubstrate, libactivator, preferenceloader
 Architecture: iphoneos-arm
 Description: Run custom commands via Activator
 Section: Tweaks
 Depiction: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=cmdivatorDp
 Homepage: http://moreinfo.thebigboss.org/moreinfo/depiction.php?file=cmdivatorDp
-Icon: file:///Library/Cmdivator/Cmdivator.png
+Icon: file:///Library/PreferenceBundles/Cmdivator.bundle/Icon@2x.png
 Sponsor: thebigboss.org <http://thebigboss.org>
 Tag: purpose::extension, role::enduser
 dev: joejordan
