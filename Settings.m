@@ -43,6 +43,7 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 }
 
 - (void)viewWillAppear:(BOOL)animated {
+    [self refreshCommands];
     if (_needsReload) {
         _needsReload = NO;
         if (_specifiers) {
