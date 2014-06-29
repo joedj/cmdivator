@@ -13,7 +13,7 @@
 
 @implementation Cmdivator {
     NSMutableDictionary *_listeners;
-    NSMutableDictionary *_icons;
+    NSData *_icon;
     CmdivatorScanner *_scanner;
     CPDistributedMessagingCenter *_messagingCenter;
 }
@@ -28,7 +28,6 @@
 - (instancetype)init {
     if ((self = [super init])) {
         _listeners = [[NSMutableDictionary alloc] init];
-        _icons = [[NSMutableDictionary alloc] init];
 
         _scanner = [[CmdivatorScanner alloc] init];
         Cmdivator * __weak w_self = self;
@@ -90,17 +89,17 @@
 }
 
 - (NSData *)activator:(LAActivator *)activator requiresSmallIconDataForListenerName:(NSString *)listenerName scale:(CGFloat *)scale {
-    NSData *icon = _icons[@(*scale)];
-    if (!icon) {
+    if (!_icon) {
         if (*scale == 1.0) {
-            icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon.png"];
+            _icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon.png"];
         } else {
-            *scale = 2.0;
-            icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon@2x.png"];
+            _icon = [NSData dataWithContentsOfFile:@"/Library/PreferenceBundles/Cmdivator.bundle/Icon@2x.png"];
         }
-        _icons[@(*scale)] = icon;
     }
-    return icon;
+    if (*scale != 1.0) {
+        *scale = 2.0;
+    }
+    return _icon;
 }
 
 - (NSDictionary *)listCommands {
@@ -115,7 +114,7 @@
 }
 
 - (void)didReceiveMemoryWarning:(NSNotification *)notification {
-    [_icons removeAllObjects];
+    _icon = nil;
 }
 
 @end
