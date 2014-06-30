@@ -3,15 +3,14 @@
 
 @implementation CmdivatorDirectoryEnumerator {
     NSUInteger _maxDepth;
-    NSArray *_keys;
+    NSMutableArray *_keys;
 }
 
 - (instancetype)initWithMaxDepth:(NSUInteger)maxDepth includePropertiesForKeys:(NSArray *)keys {
     if ((self = [super init])) {
         _maxDepth = maxDepth;
-        NSMutableArray *allKeys = [NSMutableArray arrayWithObjects:NSURLNameKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey, nil];
-        [allKeys addObjectsFromArray:keys];
-        _keys = allKeys;
+        _keys = [NSMutableArray arrayWithObjects:NSURLNameKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey, nil];
+        [_keys addObjectsFromArray:keys];
     }
     return self;
 }
@@ -27,13 +26,10 @@
     }
 
     NSDirectoryEnumerator *dirEnumerator = [NSFileManager.defaultManager enumeratorAtURL:url
-        includingPropertiesForKeys:_keys
-        options:0
-        errorHandler:^(NSURL *url, NSError *error) {
-            LOG(@"Error while scanning filesystem: at %@: %@", url, error);
-            return YES;
-        }
-    ];
+            includingPropertiesForKeys:_keys options:0 errorHandler:^(NSURL *url, NSError *error) {
+        LOG(@"Error while scanning filesystem: at %@: %@", url, error);
+        return YES;
+    }];
 
     for (NSURL * __strong url in dirEnumerator) {
         NSError * __autoreleasing error = nil;

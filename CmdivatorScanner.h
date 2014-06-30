@@ -1,4 +1,4 @@
-typedef void (^CmdivatorScannerCallback)(NSSet *urls);
+typedef void (^CmdivatorScannerCallback)(NSSet *paths);
 
 @interface CmdivatorScanner: NSObject
 - (void)startWithCallback:(CmdivatorScannerCallback)callback;

@@ -5,36 +5,25 @@
 
 #define LISTENER_NAME_PREFIX @"net.joedj.cmdivator.listener:"
 
-@implementation CmdivatorCmd {
-    NSURL *_url;
-}
+@implementation CmdivatorCmd
 
-- (instancetype)initWithURL:(NSURL *)url {
+- (instancetype)initWithPath:(NSString *)path {
     if ((self = [super init])) {
-        _url = url;
+        _path = path;
     }
     return self;
 }
 
 - (NSString *)displayName {
-    return _url.lastPathComponent;
+    return _path.lastPathComponent;
 }
 
 - (NSString *)displayPath {
-    return _url.path.stringByAbbreviatingWithTildeInPath;
+    return _path.stringByAbbreviatingWithTildeInPath;
 }
 
 - (NSString *)listenerName {
-    return [LISTENER_NAME_PREFIX stringByAppendingString:_url.path];
-}
-
-- (NSDictionary *)dictionary {
-    return @{
-        @"displayName" : self.displayName,
-        @"listenerName" : self.listenerName,
-        @"displayPath" : self.displayPath,
-        @"path" : _url.path
-    };
+    return [LISTENER_NAME_PREFIX stringByAppendingString:_path];
 }
 
 - (void)runForEvent:(LAEvent *)event {
@@ -64,7 +53,7 @@
             }
         });
 
-        NSString *path = _url.path;
+        NSString *path = _path;
         const char *const cmd = path.fileSystemRepresentation;
         const char *const cmd_argv[] = { cmd, NULL };
         const char *const cmd_envp[] = {
@@ -100,10 +89,14 @@
     });
 }
 
+- (BOOL)isRemovable {
+    return [NSFileManager.defaultManager isDeletableFileAtPath:_path];
+}
+
 - (BOOL)delete {
     NSError * __autoreleasing error = nil;
-    if (![NSFileManager.defaultManager removeItemAtURL:_url error:&error]) {
-        LOG(@"Unable to delete command %@: %@", _url, error);
+    if (![NSFileManager.defaultManager removeItemAtPath:_path error:&error]) {
+        LOG(@"Unable to delete command %@: %@", _path, error);
         return NO;
     }
     return YES;

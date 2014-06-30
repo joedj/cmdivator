@@ -12,7 +12,7 @@
 @end
 
 @implementation Cmdivator {
-    NSMutableDictionary *_listeners;
+    NSMutableDictionary *_commands;
     NSData *_icon;
     CmdivatorScanner *_scanner;
     CPDistributedMessagingCenter *_messagingCenter;
@@ -27,24 +27,23 @@
 
 - (instancetype)init {
     if ((self = [super init])) {
-        _listeners = [[NSMutableDictionary alloc] init];
+        _commands = [[NSMutableDictionary alloc] init];
 
         _scanner = [[CmdivatorScanner alloc] init];
         Cmdivator * __weak w_self = self;
-        [_scanner startWithCallback:^(NSSet *urls) {
-            [w_self replaceCommandsWithURLs:urls];
+        [_scanner startWithCallback:^(NSSet *paths) {
+            [w_self replaceCommandsWithPaths:paths];
         }];
 
         _messagingCenter = [CPDistributedMessagingCenter centerNamed:MESSAGE_CENTER_NAME];
         [_messagingCenter registerForMessageName:@"listCommands" target:self selector:@selector(listCommands)];
         [_messagingCenter registerForMessageName:@"refreshCommands" target:self selector:@selector(refreshCommands)];
-        [_messagingCenter registerForMessageName:@"deleteCommand" target:self selector:@selector(deleteCommandForMessageName:userInfo:)];
         [_messagingCenter runServerOnCurrentThread];
 
         [NSNotificationCenter.defaultCenter addObserver:self
-            selector:@selector(didReceiveMemoryWarning:)
-            name:UIApplicationDidReceiveMemoryWarningNotification
-            object:nil];
+                selector:@selector(didReceiveMemoryWarning:)
+                name:UIApplicationDidReceiveMemoryWarningNotification
+                object:nil];
     }
     return self;
 }
@@ -52,26 +51,26 @@
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
     [_scanner stop];
-    [self replaceCommandsWithURLs:nil];
+    [self replaceCommandsWithPaths:nil];
 }
 
-- (void)replaceCommandsWithURLs:(NSSet *)urls {
-    for (NSString *listenerName in _listeners) {
+- (void)replaceCommandsWithPaths:(NSSet *)paths {
+    for (NSString *listenerName in _commands) {
         [LASharedActivator unregisterListenerWithName:listenerName];
     }
-    _listeners = [[NSMutableDictionary alloc] init];
-    for (NSURL *url in urls) {
-        CmdivatorCmd *cmd = [[CmdivatorCmd alloc] initWithURL:url];
+    _commands = [[NSMutableDictionary alloc] init];
+    for (NSString *path in paths) {
+        CmdivatorCmd *cmd = [[CmdivatorCmd alloc] initWithPath:path];
         NSString *listenerName = cmd.listenerName;
-        _listeners[listenerName] = cmd;
+        _commands[listenerName] = cmd;
         [LASharedActivator registerListener:self forName:listenerName];
     }
     notify_post(COMMANDS_CHANGED_NOTIFICATION);
 }
 
 - (void)activator:(LAActivator *)activator receiveEvent:(LAEvent *)event forListenerName:(NSString *)listenerName {
-    CmdivatorCmd *cmd = _listeners[listenerName];
     event.handled = YES;
+    CmdivatorCmd *cmd = _commands[listenerName];
     [cmd runForEvent:event];
 }
 
@@ -80,12 +79,12 @@
 }
 
 - (NSString *)activator:(LAActivator *)activator requiresLocalizedTitleForListenerName:(NSString *)listenerName {
-    CmdivatorCmd *cmd = _listeners[listenerName];
+    CmdivatorCmd *cmd = _commands[listenerName];
     return cmd.displayName;
 }
 
 - (NSString *)activator:(LAActivator *)activator requiresLocalizedDescriptionForListenerName:(NSString *)listenerName {
-    CmdivatorCmd *cmd = _listeners[listenerName];
+    CmdivatorCmd *cmd = _commands[listenerName];
     return cmd.displayPath;
 }
 
@@ -104,21 +103,14 @@
 }
 
 - (NSDictionary *)listCommands {
-    NSArray *sortedCommands = [_listeners.allValues sortedArrayUsingComparator:^NSComparisonResult(CmdivatorCmd *cmd1, CmdivatorCmd *cmd2) {
+    NSArray *sortedCommands = [_commands.allValues sortedArrayUsingComparator:^NSComparisonResult(CmdivatorCmd *cmd1, CmdivatorCmd *cmd2) {
         return [cmd1.displayName caseInsensitiveCompare:cmd2.displayName];
     }];
-    return @{ @"commands" : [sortedCommands valueForKey:@"dictionary"] };
+    return @{ @"commands" : [sortedCommands valueForKey:@"path"] };
 }
 
 - (void)refreshCommands {
     [_scanner scan];
-}
-
-- (void)deleteCommandForMessageName:(NSString *)messageName userInfo:(NSDictionary *)userInfo {
-    CmdivatorCmd *cmd = _listeners[userInfo[@"listenerName"]];
-    if ([cmd delete]) {
-        [self refreshCommands];
-    }
 }
 
 - (void)didReceiveMemoryWarning:(NSNotification *)notification {

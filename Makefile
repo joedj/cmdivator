@@ -10,13 +10,13 @@ ADDITIONAL_CFLAGS += -g -fobjc-arc -fvisibility=hidden
 ADDITIONAL_LDFLAGS += -g -fobjc-arc -Wl,-map,$@.map -x c /dev/null -x none
 
 TWEAK_NAME = Cmdivator
-Cmdivator_FILES = Cmdivator.m CmdivatorCmd.m CmdivatorScanner.m CmdivatorDirectoryEnumerator.m
+Cmdivator_FILES = Cmdivator.m CmdivatorCmd.m CmdivatorDirectoryEnumerator.m CmdivatorScanner.m
 Cmdivator_LIBRARIES = activator
 Cmdivator_FRAMEWORKS = UIKit
 Cmdivator_PRIVATE_FRAMEWORKS = AppSupport
 
 BUNDLE_NAME = Settings
-Settings_FILES = Settings.m
+Settings_FILES = CmdivatorCmd.m Settings.m
 Settings_LIBRARIES = activator
 Settings_FRAMEWORKS = UIKit
 Settings_PRIVATE_FRAMEWORKS = AppSupport Preferences

@@ -81,14 +81,14 @@
     _timer = nil;
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSMutableSet *urls = [[NSMutableSet alloc] init];
+        NSMutableSet *paths = [[NSMutableSet alloc] init];
         CmdivatorDirectoryEnumeratorCallback callback = ^(NSURL *url) {
             NSError * __autoreleasing error = nil;
             NSNumber *isExecutable = nil;
             if (![url getResourceValue:&isExecutable forKey:NSURLIsExecutableKey error:&error]) {
                 LOG(@"Error while scanning filesystem: NSURLIsExecutableKey: at %@: %@", url, error);
             } else if (isExecutable.boolValue) {
-                [urls addObject:url];
+                [paths addObject:url.path];
             }
         };
         for (NSString *dir in _dirs) {
@@ -97,7 +97,7 @@
         }
         dispatch_async(dispatch_get_main_queue(), ^{
             if (_callback) {
-                _callback(urls);
+                _callback(paths);
                 [self scheduleScan:FALLBACK_SCAN_INTERVAL_SECONDS];
             }
         });

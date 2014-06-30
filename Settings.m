@@ -2,9 +2,14 @@
 #import <libactivator/libactivator.h>
 #import <Preferences/Preferences.h>
 
+#import "CmdivatorCmd.h"
 #import "Common.h"
 
 @interface CmdivatorCmdCell: PSTableCell
+@end
+
+@interface PSSpecifier (Cmdivator)
+@property (retain, nonatomic) CmdivatorCmd *cmd;
 @end
 
 @interface CmdivatorSettingsController: PSListController
@@ -25,22 +30,20 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
     if ((self = [super init])) {
         _messagingCenter = [CPDistributedMessagingCenter centerNamed:MESSAGE_CENTER_NAME];
         CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), (__bridge void *)self, commands_changed,
-            CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL, CFNotificationSuspensionBehaviorCoalesce);
+                CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL, CFNotificationSuspensionBehaviorCoalesce);
     }
     return self;
 }
 
 - (void)dealloc {
     CFNotificationCenterRemoveObserver(CFNotificationCenterGetDarwinNotifyCenter(), (__bridge void *)self,
-        CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL);
+            CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL);
 }
 
 - (void)viewDidLoad {
     UIImage *refreshIcon = [UIImage imageNamed:@"Refresh" inBundle:[NSBundle bundleForClass:self.class]];
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:refreshIcon
-        style:UIBarButtonItemStylePlain
-        target:self
-        action:@selector(refreshCommands)];
+            style:UIBarButtonItemStylePlain target:self action:@selector(refreshCommands)];
     [super viewDidLoad];
 }
 
@@ -67,7 +70,8 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 
         UIImage *iFileIcon = [LAActivator.sharedInstance smallIconForListenerName:@"eu.heinelt.ifile"];
         if (iFileIcon) {
-            PSSpecifier *iFileSpecifier = [PSSpecifier preferenceSpecifierNamed:@"Open iFile" target:self set:nil get:nil detail:nil cell:PSButtonCell edit:nil];
+            PSSpecifier *iFileSpecifier = [PSSpecifier preferenceSpecifierNamed:@"Open iFile"
+                    target:self set:nil get:nil detail:nil cell:PSButtonCell edit:nil];
             [iFileSpecifier setProperty:iFileIcon forKey:@"iconImage"];
             iFileSpecifier->action = @selector(open_iFile);
             [specifiers addObject:iFileSpecifier];
@@ -76,13 +80,14 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
         [specifiers addObject:PSSpecifier.emptyGroupSpecifier];
 
         NSArray *cmds = [_messagingCenter sendMessageAndReceiveReplyName:@"listCommands" userInfo:nil][@"commands"];
-        for (NSDictionary *cmd in cmds) {
-            PSSpecifier *cmdSpecifier = [PSSpecifier preferenceSpecifierNamed:cmd[@"displayName"] target:self set:nil get:@selector(displayPathForSpecifier:) detail:nil cell:PSLinkListCell edit:nil];
+        for (NSString *path in cmds) {
+            CmdivatorCmd *cmd = [[CmdivatorCmd alloc] initWithPath:path];
+            PSSpecifier *cmdSpecifier = [PSSpecifier preferenceSpecifierNamed:cmd.displayName
+                    target:self set:nil get:@selector(displayPathForSpecifier:) detail:nil cell:PSLinkListCell edit:nil];
+            cmdSpecifier.cmd = cmd;
             [cmdSpecifier setProperty:CmdivatorCmdCell.class forKey:@"cellClass"];
-            [cmdSpecifier setProperty:cmd[@"listenerName"] forKey:@"activatorListener"];
-            [cmdSpecifier setProperty:cmd[@"displayName"] forKey:@"activatorTitle"];
-            [cmdSpecifier setProperty:cmd[@"displayPath"] forKey:@"cmdivatorDisplayPath"];
-            [cmdSpecifier setProperty:cmd[@"path"] forKey:@"cmdivatorPath"];
+            [cmdSpecifier setProperty:cmd.listenerName forKey:@"activatorListener"];
+            [cmdSpecifier setProperty:cmd.displayName forKey:@"activatorTitle"];
             [cmdSpecifier setProperty:[NSBundle bundleWithIdentifier:@"com.libactivator.preferencebundle"].bundlePath forKey:@"lazy-bundle"];
             cmdSpecifier->action = @selector(lazyLoadBundle:);
             [specifiers addObject:cmdSpecifier];
@@ -92,7 +97,7 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 }
 
 - (NSString *)displayPathForSpecifier:(PSSpecifier *)specifier {
-    return [specifier propertyForKey:@"cmdivatorDisplayPath"];
+    return specifier.cmd.displayPath;
 }
 
 - (void)refreshCommands {
@@ -105,11 +110,14 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
     [UIApplication.sharedApplication openURL:iFileURL];
 }
 
-- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+- (PSSpecifier *)specifierAtIndexPath:(NSIndexPath *)indexPath {
     int specifierIndex = [self indexOfGroup:indexPath.section] + indexPath.row + 1;
-    PSSpecifier *specifier = [_specifiers objectAtIndex:specifierIndex];
-    NSString *path = [specifier propertyForKey:@"cmdivatorPath"];
-    if (path && [NSFileManager.defaultManager isDeletableFileAtPath:path]) {
+    return [_specifiers objectAtIndex:specifierIndex];
+}
+
+- (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
+    PSSpecifier *specifier = [self specifierAtIndexPath:indexPath];
+    if (specifier.cmd.removable) {
         return UITableViewCellEditingStyleDelete;
     }
     return UITableViewCellEditingStyleNone;
@@ -117,10 +125,10 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
-        int specifierIndex = [self indexOfGroup:indexPath.section] + indexPath.row + 1;
-        PSSpecifier *specifier = [self specifierAtIndex:specifierIndex];
-        NSString *listenerName = [specifier propertyForKey:@"activatorListener"];
-        [_messagingCenter sendMessageName:@"deleteCommand" userInfo:@{ @"listenerName" : listenerName }];
+        PSSpecifier *specifier = [self specifierAtIndexPath:indexPath];
+        if ([specifier.cmd delete]) {
+            [self refreshCommands];
+        }
     }
 }
 
@@ -134,4 +142,16 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
     }
     return self;
 }
+@end
+
+@implementation PSSpecifier (Cmdivator)
+
+- (CmdivatorCmd *)cmd {
+    return [self propertyForKey:@"cmdivatorCmd"];
+}
+
+- (void)setCmd:(CmdivatorCmd *)cmd {
+    [self setProperty:cmd forKey:@"cmdivatorCmd"];
+}
+
 @end
