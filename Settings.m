@@ -35,15 +35,24 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
         CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL);
 }
 
-- (void)reloadSpecifiersIfVisible {
-    if (_specifiers && self.isViewLoaded && self.view.window) {
-        [self reloadSpecifiers];
-    }
+- (void)viewDidLoad {
+    UIImage *refreshIcon = [UIImage imageNamed:@"Refresh" inBundle:[NSBundle bundleForClass:self.class]];
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithImage:refreshIcon
+        style:UIBarButtonItemStylePlain
+        target:self
+        action:@selector(refreshCommands)];
+    [super viewDidLoad];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [self refreshCommands];
     [super viewWillAppear:animated];
+}
+
+- (void)reloadSpecifiersIfVisible {
+    if (_specifiers && self.isViewLoaded && self.view.window) {
+        [self reloadSpecifiers];
+    }
 }
 
 - (NSArray *)specifiers {
@@ -56,10 +65,6 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
         [topGroup setProperty:footerText forKey:@"footerText"];
         [specifiers addObject:topGroup];
 
-        PSSpecifier *refreshButton = [PSSpecifier preferenceSpecifierNamed:@"Refresh" target:self set:nil get:nil detail:nil cell:PSButtonCell edit:nil];
-        refreshButton->action = @selector(refreshCommands);
-        [specifiers addObject:refreshButton];
-
         UIImage *iFileIcon = [LAActivator.sharedInstance smallIconForListenerName:@"eu.heinelt.ifile"];
         if (iFileIcon) {
             PSSpecifier *iFileSpecifier = [PSSpecifier preferenceSpecifierNamed:@"Open iFile" target:self set:nil get:nil detail:nil cell:PSButtonCell edit:nil];
@@ -68,8 +73,7 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
             [specifiers addObject:iFileSpecifier];
         }
 
-        PSSpecifier *commandsGroup = [PSSpecifier preferenceSpecifierNamed:@"Commands" target:nil set:nil get:nil detail:nil cell:PSGroupCell edit:nil];
-        [specifiers addObject:commandsGroup];
+        [specifiers addObject:PSSpecifier.emptyGroupSpecifier];
 
         NSArray *cmds = [_messagingCenter sendMessageAndReceiveReplyName:@"listCommands" userInfo:nil][@"commands"];
         for (NSDictionary *cmd in cmds) {
