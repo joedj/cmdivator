@@ -11,13 +11,12 @@
 
 @implementation CmdivatorSettingsController {
     CPDistributedMessagingCenter *_messagingCenter;
-    BOOL _needsReload;
 }
 
 static void commands_changed(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo) {
     CmdivatorSettingsController *controller = (__bridge CmdivatorSettingsController *)observer;
     dispatch_async(dispatch_get_main_queue(), ^{
-        [controller scheduleReload];
+        [controller reloadSpecifiersIfVisible];
     });
 }
 
@@ -35,24 +34,14 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
         CFSTR(COMMANDS_CHANGED_NOTIFICATION), NULL);
 }
 
-- (void)scheduleReload {
-    if (_specifiers) {
-        if (self.isViewLoaded && self.view.window) {
-            [self reloadSpecifiers];
-        } else {
-            _needsReload = YES;
-        }
+- (void)reloadSpecifiersIfVisible {
+    if (_specifiers && self.isViewLoaded && self.view.window) {
+        [self reloadSpecifiers];
     }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [self refreshCommands];
-    if (_needsReload) {
-        _needsReload = NO;
-        if (_specifiers) {
-            [self reloadSpecifiers];
-        }
-    }
     [super viewWillAppear:animated];
 }
 
