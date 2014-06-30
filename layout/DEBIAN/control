@@ -1,6 +1,6 @@
 Package: net.joedj.cmdivator
 Name: Cmdivator
-Version: 0.1
+Version: 1.0
 Author: joedj <cmdivator@joedj.net>
 Maintainer: BigBoss <bigboss@thebigboss.org>
 Depends: firmware (>= 5.0), mobilesubstrate, libactivator, preferenceloader
