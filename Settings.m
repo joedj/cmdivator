@@ -3,6 +3,9 @@
 
 #import "Common.h"
 
+@interface CmdivatorCmdCell: PSTableCell
+@end
+
 @interface CmdivatorSettingsController: PSListController
 @end
 
@@ -72,9 +75,11 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 
         NSArray *cmds = [_messagingCenter sendMessageAndReceiveReplyName:@"listCommands" userInfo:nil][@"commands"];
         for (NSDictionary *cmd in cmds) {
-            PSSpecifier *cmdSpecifier = [PSSpecifier preferenceSpecifierNamed:cmd[@"displayName"] target:self set:nil get:nil detail:nil cell:PSLinkCell edit:nil];
+            PSSpecifier *cmdSpecifier = [PSSpecifier preferenceSpecifierNamed:cmd[@"displayName"] target:self set:nil get:@selector(displayPathForSpecifier:) detail:nil cell:PSLinkListCell edit:nil];
+            [cmdSpecifier setProperty:CmdivatorCmdCell.class forKey:@"cellClass"];
             [cmdSpecifier setProperty:cmd[@"listenerName"] forKey:@"activatorListener"];
             [cmdSpecifier setProperty:cmd[@"displayName"] forKey:@"activatorTitle"];
+            [cmdSpecifier setProperty:cmd[@"displayPath"] forKey:@"cmdivatorDisplayPath"];
             [cmdSpecifier setProperty:cmd[@"path"] forKey:@"cmdivatorPath"];
             [cmdSpecifier setProperty:[NSBundle bundleWithIdentifier:@"com.libactivator.preferencebundle"].bundlePath forKey:@"lazy-bundle"];
             cmdSpecifier->action = @selector(lazyLoadBundle:);
@@ -86,6 +91,10 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
 
 - (void)refreshCommands {
     [_messagingCenter sendMessageName:@"refreshCommands" userInfo:nil];
+}
+
+- (NSString *)displayPathForSpecifier:(PSSpecifier *)specifier {
+    return [specifier propertyForKey:@"cmdivatorDisplayPath"];
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -107,4 +116,14 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
     }
 }
 
+@end
+
+@implementation CmdivatorCmdCell
+- (id)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)identifier specifier:(PSSpecifier *)specifier {
+    if ((self = [super initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:NSStringFromClass(self.class) specifier:specifier])) {
+        self.textLabel.adjustsFontSizeToFitWidth = YES;
+        self.detailTextLabel.adjustsFontSizeToFitWidth = YES;
+    }
+    return self;
+}
 @end

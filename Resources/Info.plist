@@ -1,4 +1,5 @@
 {
     CFBundleIdentifier = "net.joedj.cmdivator.settings";
     CFBundleExecutable = Cmdivator;
+    NSPrincipalClass = CmdivatorSettingsController;
 }

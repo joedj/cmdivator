@@ -32,6 +32,7 @@
     return @{
         @"displayName" : self.displayName,
         @"listenerName" : self.listenerName,
+        @"displayPath" : self.displayPath,
         @"path" : _url.path
     };
 }
