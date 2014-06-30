@@ -17,6 +17,8 @@ Cmdivator_PRIVATE_FRAMEWORKS = AppSupport
 
 BUNDLE_NAME = Settings
 Settings_FILES = Settings.m
+Settings_LIBRARIES = activator
+Settings_FRAMEWORKS = UIKit
 Settings_PRIVATE_FRAMEWORKS = AppSupport Preferences
 Settings_INSTALL_PATH = /Library/PreferenceBundles
 

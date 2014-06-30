@@ -1,4 +1,5 @@
 #import <AppSupport/CPDistributedMessagingCenter.h>
+#import <libactivator/libactivator.h>
 #import <Preferences/Preferences.h>
 
 #import "Common.h"
@@ -59,6 +60,14 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
         refreshButton->action = @selector(refreshCommands);
         [specifiers addObject:refreshButton];
 
+        UIImage *iFileIcon = [LAActivator.sharedInstance smallIconForListenerName:@"eu.heinelt.ifile"];
+        if (iFileIcon) {
+            PSSpecifier *iFileSpecifier = [PSSpecifier preferenceSpecifierNamed:@"Open iFile" target:self set:nil get:nil detail:nil cell:PSButtonCell edit:nil];
+            [iFileSpecifier setProperty:iFileIcon forKey:@"iconImage"];
+            iFileSpecifier->action = @selector(open_iFile);
+            [specifiers addObject:iFileSpecifier];
+        }
+
         PSSpecifier *commandsGroup = [PSSpecifier preferenceSpecifierNamed:@"Commands" target:nil set:nil get:nil detail:nil cell:PSGroupCell edit:nil];
         [specifiers addObject:commandsGroup];
 
@@ -78,12 +87,18 @@ static void commands_changed(CFNotificationCenterRef center, void *observer, CFS
     return _specifiers;
 }
 
+- (NSString *)displayPathForSpecifier:(PSSpecifier *)specifier {
+    return [specifier propertyForKey:@"cmdivatorDisplayPath"];
+}
+
 - (void)refreshCommands {
     [_messagingCenter sendMessageName:@"refreshCommands" userInfo:nil];
 }
 
-- (NSString *)displayPathForSpecifier:(PSSpecifier *)specifier {
-    return [specifier propertyForKey:@"cmdivatorDisplayPath"];
+- (void)open_iFile {
+    NSURL *fileURL = [NSURL fileURLWithPath:USER_COMMANDS_DIRECTORY];
+    NSURL *iFileURL = [NSURL URLWithString:[@"i" stringByAppendingString:fileURL.absoluteString]];
+    [UIApplication.sharedApplication openURL:iFileURL];
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
