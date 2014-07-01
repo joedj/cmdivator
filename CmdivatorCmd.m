@@ -54,9 +54,9 @@
         });
 
         NSString *path = _path;
-        const char *const cmd = path.fileSystemRepresentation;
-        const char *const cmd_argv[] = { cmd, NULL };
-        const char *const cmd_envp[] = {
+        const char * const cmd = path.fileSystemRepresentation;
+        const char * const cmd_argv[] = { cmd, NULL };
+        const char * const cmd_envp[] = {
             [@"ACTIVATOR_LISTENER_NAME=" stringByAppendingString:self.listenerName].UTF8String,
             [@"ACTIVATOR_EVENT_NAME=" stringByAppendingString:event.name].UTF8String,
             [@"ACTIVATOR_EVENT_MODE=" stringByAppendingString:event.mode].UTF8String,
@@ -64,7 +64,7 @@
         };
         pid_t pid;
         int ret;
-        if (!(ret = posix_spawn(&pid, cmd, &cmd_spawn_file_actions, &cmd_spawnattr, (char* const*)cmd_argv, (char* const*)cmd_envp))) {
+        if (!(ret = posix_spawn(&pid, cmd, &cmd_spawn_file_actions, &cmd_spawnattr, (char * const *)cmd_argv, (char * const *)cmd_envp))) {
             dispatch_source_t exit_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, pid, DISPATCH_PROC_EXIT, dispatch_get_main_queue());
             dispatch_source_set_event_handler(exit_source, ^{
                 int status;
